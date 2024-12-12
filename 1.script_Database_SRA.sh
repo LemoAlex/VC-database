@@ -32,5 +32,5 @@ mv scaffolds.fasta genome_$p.fasta
 conda deactivate spades-env 
 cd .. ;
 
-done < strains_GCA
+done < strains_SRA
 
