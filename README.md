@@ -17,3 +17,8 @@ Spades: https://github.com/ablab/spades
 
 Unicycler: https://github.com/rrwick/Unicycler
 
+The database creation will be in 4 parts:
+1. Genome assembled using Spades from SRA reads. --> We need a strain list with the SRA accession numbers. We did a litterature search for this, but a "general one" can be found for VC in Legault et al. 2021 ( DOI: 10.1126/science.abg2166 )
+2. Genomes from Refseq database (simple download)
+3. Genomes from Genbank
+4. Genome assembled using Unicycler from long reads
