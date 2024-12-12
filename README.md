@@ -13,6 +13,8 @@ Mamba: https://github.com/mamba-org/mamba (or Conda, in order to create a virtua
 
 SRAtools : https://github.com/ncbi/sra-tools 
 
+ncbi-datasets: https://github.com/ncbi/datasets
+
 Spades: https://github.com/ablab/spades
 
 Unicycler: https://github.com/rrwick/Unicycler
