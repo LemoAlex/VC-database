@@ -1,0 +1,23 @@
+
+#run line by line, not as a bash script (not sh script.sh)
+## blast sequence against our vibrio databse, set percentage identity to 80, and a mximum target sequences of 10'000. outfmt 6 is a tabular format output
+
+blastn -query sequence.fa -db vibrio_database -outfmt 6 -perc_identity 80 -max_target_seqs 10000 > blast_output
+
+#using this script, transform blast to bed output
+blast2bed blast_output
+
+#sort the file
+bedtools sort -i blast_output > blast_output.sort.bed
+
+#merge the bed file to have only 1 sequence per contigs. the -d factor is the distance of merging, depends on the total size of the searched sequence
+
+bedtools merge -d 50 -i blast_output.sort.bed > blast_output.final
+
+#get the length for each contigs, if interested. 
+ awk '{a=$3-$2;print $0,a;}' blast_output.final  
+
+
+# gather the fasta sequences
+bedtools getfasta -fi vibrio_database.fasta -fo all_sequences.fasta -bed blast_output.final
+ 
