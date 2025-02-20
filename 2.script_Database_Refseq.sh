@@ -18,3 +18,11 @@ conda deactivate
 
  done < strains_GCF
 
+
+conda activate ncbi_datasets-env
+
+datasets download genome taxon 666 --assembly-source 'Refseq' --dehydrated --include genome --exclude-multi-isolate
+
+mv ncbi_dataset.zip vibrio_refseq_1965.zip
+unzip -d vibrio_refseq_1965 vibrio_refseq_1965.zip
+datasets rehydrate --directory vibrio_refseq_1965
