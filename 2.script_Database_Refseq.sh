@@ -19,10 +19,28 @@ conda deactivate
  done < strains_GCF
 
 
-conda activate ncbi_datasets-env
 
+conda activate ncbi_datasets-env
 datasets download genome taxon 666 --assembly-source 'Refseq' --dehydrated --include genome --exclude-multi-isolate
 
 mv ncbi_dataset.zip vibrio_refseq_1965.zip
 unzip -d vibrio_refseq_1965 vibrio_refseq_1965.zip
 datasets rehydrate --directory vibrio_refseq_1965
+
+
+datasets download genome taxon 666 --assembly-source 'Genbank' --dehydrated --include genome --exclude-multi-isolate --mag exclude --filename genbank.zip
+
+mv ncbi_dataset.zip vibrio_Genbank_2209.zip
+unzip -d vibrio_Genbank_2209 vibrio_Genbank_2209.zip
+datasets rehydrate --directory vibrio_Genbank_2209
+
+
+
+datasets summary genome taxon "666" --exclude-multi-isolate --mag exclude --as-json-lines  > update_datasets_200225
+ dataformat tsv genome --inputfile update_datasets_200225 > metadata_date.tsv
+ cut -f 1,44,49,60,76,109,152,165,169 metadata_date.tsv | uniq > final_metadata.tsv ## MANUALLY CHECK FOR MISSING SOURCE_DATABASE AND REPLACE WITH REFSEQ//GENBANK
+
+ 
+grep 'REFSEQ' final_metadata.tsv | cut -f 3 > BIOSAMPLE_refseq
+grep 'GENBANK' final_metadata.tsv > GENBANK.tsv
+grep -f BIOSAMPLE_refseq -v GENBANK.tsv
