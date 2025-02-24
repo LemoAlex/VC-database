@@ -44,3 +44,15 @@ datasets summary genome taxon "666" --exclude-multi-isolate --mag exclude --as-j
 grep 'REFSEQ' final_metadata.tsv | cut -f 3 > BIOSAMPLE_refseq
 grep 'GENBANK' final_metadata.tsv > GENBANK.tsv
 grep -f BIOSAMPLE_refseq -v GENBANK.tsv
+
+
+#ALL
+
+datasets download genome taxon 666 --dehydrated --include genome --exclude-multi-isolate --mag exclude --filename vc_240225.zip
+unzip -d vc_240225.zip
+mkdir vc_240225
+cp -r ncbi_dataset vc_240225
+rm -r ncbi_dataset
+datasets rehydrate --directory vc_240225
+datasets summary genome taxon "666" --exclude-multi-isolate --mag exclude --as-json-lines  > update_datasets_240225
+ dataformat tsv genome --inputfile update_datasets_240225 > metadata_date.tsv
