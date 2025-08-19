@@ -9,3 +9,48 @@ grep -v -f REFSEQ_biosample GENBANK > genbank_only
 grep 'GCF' final_metadata.tsv   > refseq_only
 cat refseq_only genbank_only > final_unique_metadata.tsv
 cut -f 1 final_unique_metadata.tsv > accession_final
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            datasets summary genome taxon "Vibrio cholerae" --as-json-lines \
+  | jq -r 'select(.assembly_source == "GenBank" and .refseq_category == null) | .accession' \
+  | datasets download genome accession --inputfile - --filename genbank_only.zip
+
+
+datasets summary genome taxon "Vibrio cholerae" --as-json-lines > Vchol.jsonl
+
+
+datasets summary genome taxon "Vibrio" --as-json-lines \
+  | jq -r 'select(.organism.organism_name == "Vibrio cholerae" and .assembly_source == "GenBank" and .refseq_category == null) | .assembly.accession' \
+  | datasets download genome accession --inputfile - --filename cholerae_genbank_only.zip
+
+
+
+
+
+
+
+
+curl -s "https://www.ebi.ac.uk/ena/portal/api/search?result=assembly&query=tax_eq(666)&fields=assembly_accession,bio_material,collection_date,country,sample_accession,sequence_accession,&format=tsv" > ena_ecoli.tsv
+
+curl "https://www.ebi.ac.uk/ena/portal/api/returnFields?result=assembly"
+
+# 1. Get all ENA assemblies for organism
+curl -s "https://www.ebi.ac.uk/ena/portal/api/search?result=assembly&query=tax_eq(666)&fields=accession&format=tsv&limit=0" > all_ena.tsv
+
+# 2. Get ENA assemblies that cross-reference GenBank (or RefSeq)
+curl -s "https://www.ebi.ac.uk/ena/xref/rest/tsv/search?target=assembly&source=GenBank&limit=0" | cut -f "Target_primary_accession" > with_genbank.tsv
+
+# 3. Filter unique-to-ENA
+grep -v -F -f with_genbank.tsv all_ena.tsv > unique_ena.tsv
