@@ -1,1 +1,11 @@
 
+datasets summary genome taxon "666" --exclude-multi-isolate --mag exclude --as-json-lines  > update_datasets_240225
+dataformat tsv genome --inputfile update_datasets_240225 > metadata_date.tsv
+
+cut -f 1,44,49,60,76,109,152,165,169 metadata_date.tsv | uniq > final_metadata.tsv
+grep 'GCF' final_metadata.tsv | cut -f 3 > REFSEQ_biosample
+grep 'GCA' final_metadata.tsv  > GENBANK
+grep -v -f REFSEQ_biosample GENBANK > genbank_only
+grep 'GCF' final_metadata.tsv   > refseq_only
+cat refseq_only genbank_only > final_unique_metadata.tsv
+cut -f 1 final_unique_metadata.tsv > accession_final
