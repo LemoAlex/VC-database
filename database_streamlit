@@ -1,0 +1,185 @@
+import json
+from pathlib import Path
+import pandas as pd
+import streamlit as st
+import zipfile
+import io
+
+# ---------------- CONFIG ----------------
+CONFIG_PATH = Path(__file__).with_name("config.json")
+with open(CONFIG_PATH) as f:
+    CONFIG = json.load(f)
+
+META_DIR = Path(CONFIG["metadata_dir"])
+INDEX_PATH = META_DIR / "index.json"
+PREVIEW_MAX = int(CONFIG.get("preview_max_chars", 3000))
+
+st.set_page_config(page_title="Genomic Files Portal", layout="wide")
+st.title("🔬 Genomic Files Portal")
+st.caption("Browse genomes, annotated genomes, and proteomes on the local server.")
+
+# ---------------- LOAD INDEX ----------------
+def load_index():
+    if not INDEX_PATH.exists():
+        st.warning("No index found. Run `python ingest.py` first.")
+        return pd.DataFrame(), {}
+    with open(INDEX_PATH) as f:
+        idx = json.load(f)
+
+    rows = []
+    for e in idx.get("entries", []):
+        stats = e.get("stats", {})
+        files = e.get("files", {})
+        rows.append({
+            "Select": False,  # tickbox column
+            "Organism": stats.get("organism_name") or e.get("organism_label"),
+            "Strain": stats.get("strain"),
+            "Genome Size (bp)": stats.get("genome_size_bp"),
+            "Assembly": stats.get("assembly"),
+            "Biosample": stats.get("biosample"),
+            "Collection Date": stats.get("collection_date"),
+            "Geographic Location": stats.get("geographic_location"),
+            "Locus Tag Example": stats.get("example_locus_tag") or "—",
+            "_files": files,
+            "_raw": e,
+        })
+    df = pd.DataFrame(rows)
+    return df, idx
+
+df, idx = load_index()
+if df.empty:
+    st.stop()
+
+# ---------------- DISPLAY TABLE ----------------
+st.subheader(f"Results ({len(df)})")
+
+# Let Streamlit handle sorting & filtering
+edited_df = st.data_editor(
+    df.drop(columns=["_files", "_raw"], errors="ignore"),
+    use_container_width=True,
+    num_rows="dynamic",
+    hide_index=True,
+    column_config={
+        "Select": st.column_config.CheckboxColumn("Select", help="Mark entries for download"),
+        "Genome Size (bp)": st.column_config.NumberColumn("Genome Size (bp)", format="%d"),
+    },
+    # 🔑 this enables native filtering/sorting
+    column_order=[
+        "Select",
+        "Organism",
+        "Strain",
+        "Genome Size (bp)",
+        "Assembly",
+        "Biosample",
+        "Collection Date",
+        "Geographic Location",
+        "Locus Tag Example"
+    ],
+)
+
+# Identify selected rows
+selected_rows = df.loc[edited_df[edited_df["Select"] == True].index]
+
+# ---------------- MULTIPLE DOWNLOAD ----------------
+if not selected_rows.empty:
+    st.markdown("### Download Selected Genomes")
+    download_format = st.selectbox(
+        "Choose file type to download",
+        ["Genome FASTA", "GenBank", "Proteome FASTA", "All"],
+        index=0
+    )
+    if st.button("⬇ Download Selected"):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as zf:
+            for _, row in selected_rows.iterrows():
+                files = row["_files"]
+                if download_format == "All":
+                    for kind in ["genome_fasta", "genbank", "proteome_fasta"]:
+                        path = files.get(kind, {}).get("path")
+                        if path and Path(path).exists():
+                            zf.write(path, arcname=f"{row['Organism']}_{Path(path).name}")
+                else:
+                    kind_map = {
+                        "Genome FASTA": "genome_fasta",
+                        "GenBank": "genbank",
+                        "Proteome FASTA": "proteome_fasta"
+                    }
+                    kind = kind_map[download_format]
+                    path = files.get(kind, {}).get("path")
+                    if path and Path(path).exists():
+                        zf.write(path, arcname=f"{row['Organism']}_{Path(path).name}")
+        st.download_button(
+            "Download ZIP",
+            data=buffer.getvalue(),
+            file_name="selected_genomes.zip",
+            mime="application/zip"
+        )
+
+# ---------------- DETAIL PANEL ----------------
+st.markdown("---")
+st.subheader("Details & Downloads")
+
+selected = st.selectbox(
+    "Select an entry",
+    options=list(df.index),
+    format_func=lambda i: f"{df.loc[i, 'Organism']} ({df.loc[i, 'Strain']})"
+    if pd.notna(df.loc[i, 'Strain']) else f"{df.loc[i, 'Organism']}"
+)
+
+row = df.loc[selected]
+files = row["_files"]
+stats = row["_raw"].get("stats", {})
+
+c1, c2, c3, c4 = st.columns([2, 2, 2, 2])
+with c1:
+    st.metric("Genome size (bp)", value=str(stats.get("genome_size_bp") or "—"))
+with c2:
+    st.metric("Collection Date", value=str(stats.get("collection_date") or "—"))
+with c3:
+    st.metric("Geographic Location", value=str(stats.get("geographic_location") or "—"))
+with c4:
+    st.metric("# Proteins", value=str(stats.get("num_proteins") or "—"))
+
+# ---------------- FILE DOWNLOADS ----------------
+st.write("### Downloads")
+d1, d2, d3 = st.columns(3)
+def download_button_for(kind: str, label: str):
+    path = files.get(kind, {}).get("path")
+    if not path:
+        st.button(label, disabled=True, help="Not available")
+        return
+    with open(path, "rb") as fh:
+        data = fh.read()
+    st.download_button(
+        label=label,
+        data=data,
+        file_name=Path(path).name,
+        mime="application/octet-stream"
+    )
+
+with d1:
+    download_button_for("genome_fasta", "⬇ Genome (FASTA)")
+with d2:
+    download_button_for("genbank", "⬇ Annotated Genome (GenBank)")
+with d3:
+    download_button_for("proteome_fasta", "⬇ Proteome (FASTA)")
+
+# ---------------- FILE PREVIEW ----------------
+st.write("### Preview")
+available_previews = [k for k in ["genbank", "genome_fasta", "proteome_fasta"] if files.get(k)]
+if available_previews:
+    prev_kind = st.selectbox(
+        "Preview which file?",
+        options=available_previews,
+        format_func=lambda k: {
+            "genbank": "GenBank",
+            "genome_fasta": "Genome FASTA",
+            "proteome_fasta": "Proteome FASTA"
+        }[k]
+    )
+    path = files.get(prev_kind, {}).get("path")
+    with open(path, "r") as fh:
+        txt = fh.read(PREVIEW_MAX)
+    st.code(txt, language="text")
+    if Path(path).stat().st_size > PREVIEW_MAX:
+        st.caption(f"Showing first {PREVIEW_MAX} characters…")
